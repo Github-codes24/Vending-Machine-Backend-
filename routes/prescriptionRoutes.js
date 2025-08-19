@@ -1,7 +1,15 @@
 const express = require("express");
-const { collectPrescription } = require("../controllers/prescriptionController");
+const {
+  getPrescriptionDetails,
+  collectPrescription
+} = require("../controllers/prescriptionController");
+
 const router = express.Router();
 
-router.post("/:rfid/:id/collect", collectPrescription);
+// GET prescription details by ID
+router.get("/:id/details", getPrescriptionDetails);
+
+// POST collect prescription
+router.post("/:id/collect", collectPrescription);
 
 module.exports = router;
