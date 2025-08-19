@@ -1,9 +1,8 @@
 // controllers/prescriptionController.js
-const catchAsyncErrors = require("../middlewares/catchAsyncErrors");
 const { _users } = require("./userController");
 
 // ✅ Get prescription details by ID (search inside users)
-exports.getPrescriptionDetails = catchAsyncErrors(async (req, res, next) => {
+exports.getPrescriptionDetails = async (req, res) => {
   const { id } = req.params;
 
   let foundPrescription = null;
@@ -26,10 +25,10 @@ exports.getPrescriptionDetails = catchAsyncErrors(async (req, res, next) => {
     user: { rfid: userRef.rfid, name: userRef.name },
     prescription: foundPrescription
   });
-});
+};
 
 // ✅ Collect prescription (alternate route if frontend uses prescriptionId directly)
-exports.collectPrescription = catchAsyncErrors(async (req, res, next) => {
+exports.collectPrescription = async (req, res) => {
   const { id } = req.params;
 
   let foundPrescription = null;
@@ -65,4 +64,4 @@ exports.collectPrescription = catchAsyncErrors(async (req, res, next) => {
     updatedBalance: userRef.balance,
     prescription: foundPrescription
   });
-});
+};
