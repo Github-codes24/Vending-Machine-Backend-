@@ -1,67 +1,53 @@
 // controllers/prescriptionController.js
-const { _users } = require("./userController");
+const User = require('../models/user');
+const catchAsyncErrors = require('../middlewares/catchAsyncErrors');
 
-// ✅ Get prescription details by ID (search inside users)
-exports.getPrescriptionDetails = async (req, res) => {
+// GET /api/prescriptions/:id/details
+exports.getPrescriptionDetails = catchAsyncErrors(async (req, res) => {
   const { id } = req.params;
+  const user = await User.findOne(
+    { 'prescriptions.id': id },
+    { rfid: 1, name: 1, prescriptions: 1 }
+  ).lean();
 
-  let foundPrescription = null;
-  let userRef = null;
+  if (!user) return res.status(404).json({ message: 'Prescription not found' });
 
-  _users.forEach(u => {
-    u.prescriptions.forEach(p => {
-      if (p.id === id) {
-        foundPrescription = p;
-        userRef = u;
-      }
-    });
-  });
-
-  if (!foundPrescription) {
-    return res.status(404).json({ message: "Prescription not found" });
-  }
-
+  const prescription = user.prescriptions.find(p => p.id === id);
   res.json({
-    user: { rfid: userRef.rfid, name: userRef.name },
-    prescription: foundPrescription
+    user: { rfid: user.rfid, name: user.name },
+    prescription
   });
-};
+});
 
-// ✅ Collect prescription (alternate route if frontend uses prescriptionId directly)
-exports.collectPrescription = async (req, res) => {
+// POST /api/prescriptions/:id/collect
+exports.collectPrescription = catchAsyncErrors(async (req, res) => {
   const { id } = req.params;
 
-  let foundPrescription = null;
-  let userRef = null;
+  // Fetch user with the prescription
+  const user = await User.findOne({ 'prescriptions.id': id });
+  if (!user) return res.status(404).json({ message: 'Prescription not found' });
 
-  _users.forEach(u => {
-    u.prescriptions.forEach(p => {
-      if (p.id === id) {
-        foundPrescription = p;
-        userRef = u;
-      }
-    });
-  });
+  const p = user.prescriptions.find(x => x.id === id);
+  if (!p) return res.status(404).json({ message: 'Prescription not found' });
+  if (p.collected) return res.status(400).json({ message: 'Already collected' });
 
-  if (!foundPrescription) {
-    return res.status(404).json({ message: "Prescription not found" });
-  }
-  if (foundPrescription.collected) {
-    return res.status(400).json({ message: "Already collected" });
+  // Compute total cost
+  const totalCost = (p.medicines || []).reduce((s, m) => s + (m.cost || 0), 0);
+  if (user.balance < totalCost) {
+    return res.status(400).json({ message: 'Insufficient balance' });
   }
 
-  const totalCost = foundPrescription.medicines.reduce((sum, m) => sum + (m.cost || 0), 0);
-  if (userRef.balance < totalCost) {
-    return res.status(400).json({ message: "Insufficient balance" });
-  }
+  // Update in-memory doc
+  user.balance -= totalCost;
+  p.collected = true;
+  p.collectedAt = new Date();
 
-  userRef.balance -= totalCost;
-  foundPrescription.collected = true;
+  await user.save();
 
   res.json({
     success: true,
-    message: "Prescription collected successfully",
-    updatedBalance: userRef.balance,
-    prescription: foundPrescription
+    message: 'Prescription collected successfully',
+    updatedBalance: user.balance,
+    prescription: p
   });
-};
+});

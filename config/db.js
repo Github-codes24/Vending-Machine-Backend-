@@ -1,14 +1,10 @@
+// config/db.js
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
-  if (!process.env.MONGO_URI) {
-    console.log("⚠️ Skipping MongoDB connection (mock mode).");
-    return;
-  }
-
   try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log('✅ MongoDB Connected');
+    const conn = await mongoose.connect(process.env.MONGO_URI);
+    console.log(`✅ MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
   } catch (err) {
     console.error('❌ MongoDB Connection Error:', err.message);
     process.exit(1);

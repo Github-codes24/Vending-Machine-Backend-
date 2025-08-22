@@ -1,112 +1,40 @@
 // controllers/userController.js
+const User = require('../models/user');
+const catchAsyncErrors = require('../middlewares/catchAsyncErrors');
 
-// Mock Users (skip DB for now)
-const users = [
-  {
-    rfid: "RFID1001",
-    name: "Gourab",
-    balance: 15000,
-    prescriptions: [
-      {
-        id: "#0000125",
-        for: "self",
-        medicines: [{ name: "Paracetamol", quantity: 90, cost: 80 }],
-        collected: false
-      },
-      {
-        id: "#0000457",
-        for: "wife",
-        medicines: [{ name: "Amoxicillin", quantity: 20, cost: 120 }],
-        collected: false
-      }
-    ]
-  },
-  {
-    rfid: "RFID1002",
-    name: "Aarti",
-    balance: 8000,
-    prescriptions: [
-      {
-        id: "#0000456",
-        for: "self",
-        medicines: [{ name: "Vitamin C", quantity: 30, cost: 250 }],
-        collected: false
-      }
-    ]
-  }
-];
+// ✅ Expose users array only if you still need it somewhere else (removed now)
+// module.exports._users = [...]  // <-- not needed once DB is live
 
-// ✅ RFID Scan + Welcome
-exports.getUser = (req, res) => {
+// GET /api/users/:rfid  — RFID scan + welcome
+exports.getUser = catchAsyncErrors(async (req, res) => {
   const { rfid } = req.params;
-  const user = users.find(u => u.rfid === rfid);
-
-  if (!user) return res.status(404).json({ message: "User not found" });
-
+  const user = await User.findOne({ rfid }).lean();
+  if (!user) return res.status(404).json({ message: 'User not found' });
   res.json({ rfid: user.rfid, name: user.name });
-};
+});
 
-// ✅ Balance
-exports.getBalance = (req, res) => {
+// GET /api/users/:rfid/balance
+exports.getBalance = catchAsyncErrors(async (req, res) => {
   const { rfid } = req.params;
-  const user = users.find(u => u.rfid === rfid);
-
-  if (!user) return res.status(404).json({ message: "User not found" });
-
+  const user = await User.findOne({ rfid }, { name: 1, balance: 1 }).lean();
+  if (!user) return res.status(404).json({ message: 'User not found' });
   res.json({ name: user.name, balance: user.balance });
-};
+});
 
-// ✅ All Prescriptions
-exports.getPrescriptions = (req, res) => {
+// GET /api/users/:rfid/prescriptions
+exports.getPrescriptions = catchAsyncErrors(async (req, res) => {
   const { rfid } = req.params;
-  const user = users.find(u => u.rfid === rfid);
+  const user = await User.findOne({ rfid }, { name: 1, prescriptions: 1 }).lean();
+  if (!user) return res.status(404).json({ message: 'User not found' });
+  res.json({ name: user.name, prescriptions: user.prescriptions || [] });
+});
 
-  if (!user) return res.status(404).json({ message: "User not found" });
-
-  res.json({ name: user.name, prescriptions: user.prescriptions });
-};
-
-// ✅ Prescriptions by Relation
-exports.getPrescriptionsByRelation = (req, res) => {
+// GET /api/relationships/:rfid/:relation
+exports.getPrescriptionsByRelation = catchAsyncErrors(async (req, res) => {
   const { rfid, relation } = req.params;
-  const user = users.find(u => u.rfid === rfid);
+  const user = await User.findOne({ rfid }, { name: 1, prescriptions: 1 }).lean();
+  if (!user) return res.status(404).json({ message: 'User not found' });
 
-  if (!user) return res.status(404).json({ message: "User not found" });
-
-  const filtered = user.prescriptions.filter(p => p.for === relation);
-
+  const filtered = (user.prescriptions || []).filter(p => p.for === relation);
   res.json({ name: user.name, prescriptions: filtered });
-};
-
-// ✅ Collect Prescription
-exports.collectPrescription = (req, res) => {
-  const { rfid, id } = req.params;
-  const user = users.find(u => u.rfid === rfid);
-
-  if (!user) return res.status(404).json({ message: "User not found" });
-
-  const prescription = user.prescriptions.find(p => p.id === id);
-  if (!prescription) return res.status(404).json({ message: "Prescription not found" });
-
-  if (prescription.collected) {
-    return res.status(400).json({ message: "Already collected" });
-  }
-
-  // Deduct total cost
-  const totalCost = prescription.medicines.reduce((sum, m) => sum + (m.cost || 0), 0);
-  if (user.balance < totalCost) {
-    return res.status(400).json({ message: "Insufficient balance" });
-  }
-
-  user.balance -= totalCost;
-  prescription.collected = true;
-
-  res.json({
-    message: "Prescription collected",
-    newBalance: user.balance,
-    prescription
-  });
-};
-
-// Helper export so prescriptionController can reuse
-exports._users = users;
+});

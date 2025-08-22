@@ -1,20 +1,9 @@
-const express = require("express");
+const express = require('express');
+const { getUser, getBalance, getPrescriptions } = require('../controllers/userController');
 const router = express.Router();
-const userController = require("../controllers/userController");
 
-// RFID Scan + Welcome
-router.get("/:rfid", userController.getUser);
-
-// Balance
-router.get("/:rfid/balance", userController.getBalance);
-
-// All prescriptions
-router.get("/:rfid/prescriptions", userController.getPrescriptions);
-
-// Prescriptions by relation
-router.get("/:rfid/prescriptions/:relation", userController.getPrescriptionsByRelation);
-
-// Collect prescription (by RFID + prescription ID)
-router.post("/:rfid/prescriptions/:id/collect", userController.collectPrescription);
+router.get('/:rfid', getUser);
+router.get('/:rfid/balance', getBalance);
+router.get('/:rfid/prescriptions', getPrescriptions);
 
 module.exports = router;

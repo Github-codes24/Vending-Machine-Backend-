@@ -1,10 +1,7 @@
-// routes/relationshipRoutes.js
-const express = require("express");
-const { getRelationships } = require("../controllers/relationshipController");
-
+const express = require('express');
+const { getPrescriptionsByRelation } = require('../controllers/userController');
 const router = express.Router();
 
-// GET relationships
-router.get("/:userId/relationships", getRelationships);
+router.get('/:rfid/:relation', getPrescriptionsByRelation);
 
 module.exports = router;
