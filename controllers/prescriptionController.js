@@ -1,5 +1,5 @@
 // controllers/prescriptionController.js
-const User = require('../models/user');
+const User = require('../models/User');
 const catchAsyncErrors = require('../middlewares/catchAsyncErrors');
 
 // GET /api/prescriptions/:id/details
