@@ -1,5 +1,5 @@
 // controllers/userController.js
-const User = require('../models/user');
+const User = require('../models/User');
 const catchAsyncErrors = require('../middlewares/catchAsyncErrors');
 
 // ✅ Expose users array only if you still need it somewhere else (removed now)
