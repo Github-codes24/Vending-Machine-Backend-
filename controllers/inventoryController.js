@@ -1,81 +1,62 @@
 // controllers/inventoryController.js
 const catchAsyncErrors = require('../middlewares/catchAsyncErrors');
-const InventoryItem = require('../models/InventoryItem');
-const InventoryBatch = require('../models/InventoryBatch');
+const Inventory = require('../models/Inventory');
 
-// GET /api/inventory/overview
 exports.getOverview = catchAsyncErrors(async (req, res) => {
-  const items = await InventoryItem.find().sort({ name: 1 });
+  const items = await Inventory.find().lean();
 
   const overview = items.map(i => {
     const balanceRefill = Math.max((i.totalCapacity || 0) - (i.totalInventory || 0), 0);
+    const lastRefill = (i.refillLogs || []).slice(-1)[0] || null;
     return {
-      name: i.name,
-      genericName: i.genericName,
-      brandName: i.brandName,
-      mfgBy: i.mfgBy,
-      marketedBy: i.marketedBy,
-      day: i.day || new Date().toLocaleString('en-IN', { weekday: 'long' }),
-      date: new Date().toLocaleDateString('en-GB'), // DD/MM/YYYY
-      time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
-      totalInventory: i.totalInventory,
-      totalCapacity: i.totalCapacity,
-      balanceRefill,
       itemCode: i.itemCode,
-      typeOfMedicine: i.typeOfMedicine
+      name: i.name,
+      genericName: i.genericName || '',
+      brandName: i.brandName || '',
+      mfgBy: i.mfgBy || '',
+      marketedBy: i.marketedBy || '',
+      typeOfMedicine: i.typeOfMedicine || '',
+      day: new Date().toLocaleString('en-IN', { weekday: 'long' }),
+      date: new Date().toLocaleDateString('en-GB'),
+      time: new Date().toLocaleTimeString('en-GB', { hour12: false }),
+      totalInventory: i.totalInventory || 0,
+      totalCapacity: i.totalCapacity || 0,
+      balanceRefill,
+      expiryDate: i.expiryDate || null,
     };
   });
 
   res.json({ items: overview });
 });
 
-// POST /api/inventory/add
-// body: { itemCode, name, batchNo, quantity, typeOfMedicine, genericName, brandName, mfgBy, marketedBy, totalCapacity }
+// addInventory (owner-only)
 exports.addInventory = catchAsyncErrors(async (req, res) => {
-  const {
-    itemCode, name, batchNo, quantity,
-    typeOfMedicine, genericName, brandName, mfgBy, marketedBy,
-    totalCapacity
-  } = req.body;
+  const { itemCode, name, batchNo, quantity, typeOfMedicine, expiryDate } = req.body;
+  const ownerId = req.user && req.user.id;
 
-  if (!itemCode || !name || !batchNo || !quantity) {
-    return res.status(400).json({ message: 'itemCode, name, batchNo, quantity are required' });
-  }
-
-  let item = await InventoryItem.findOne({ itemCode });
+  let item = await Inventory.findOne({ itemCode });
   if (!item) {
-    item = await InventoryItem.create({
+    item = new Inventory({
       itemCode,
       name,
-      typeOfMedicine: (typeOfMedicine || 'box').toLowerCase(),
-      genericName: genericName || '',
-      brandName: brandName || '',
-      mfgBy: mfgBy || '',
-      marketedBy: marketedBy || '',
-      totalCapacity: totalCapacity || 100,
+      typeOfMedicine,
+      totalCapacity: 100,
       totalInventory: 0,
-      day: new Date().toLocaleString('en-IN', { weekday: 'long' })
+      refillLogs: []
     });
   }
 
-  await InventoryBatch.create({
-    item: item._id,
+  item.totalInventory += Number(quantity || 0);
+  if (expiryDate) item.expiryDate = new Date(expiryDate);
+  item.refillLogs = item.refillLogs || [];
+  item.refillLogs.push({
     batchNo,
-    quantity: Number(quantity),
+    quantity: Number(quantity || 0),
+    addedBy: ownerId,
+    date: new Date()
   });
 
-  // increase stock
-  item.totalInventory = (item.totalInventory || 0) + Number(quantity);
   await item.save();
 
-  res.json({
-    success: true,
-    message: 'Inventory updated',
-    item: {
-      name: item.name,
-      itemCode: item.itemCode,
-      totalInventory: item.totalInventory,
-      totalCapacity: item.totalCapacity
-    }
-  });
+  res.json({ success: true, message: 'Inventory updated', item });
 });

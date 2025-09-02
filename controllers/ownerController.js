@@ -1,9 +1,10 @@
 // controllers/ownerController.js
 const Owner = require('../models/Owner');
 const catchAsyncErrors = require('../middlewares/catchAsyncErrors');
+const jwt = require('jsonwebtoken');
+const { generateOtp, sendOtp } = require('../utils/otpService');
 
 // POST /api/owners/auth/fingerprint
-// body: { fingerprintId }
 exports.scanFingerprint = catchAsyncErrors(async (req, res) => {
   const { fingerprintId } = req.body;
   if (!fingerprintId) return res.status(400).json({ message: 'fingerprintId required' });
@@ -20,17 +21,14 @@ exports.scanFingerprint = catchAsyncErrors(async (req, res) => {
 });
 
 // POST /api/owners/auth/rfid
-// body: { ownerId, rfid }
-exports.scanRFID = catchAsyncErrors(async (req, res) => {
+exports.scanRfid = catchAsyncErrors(async (req, res) => {
   const { ownerId, rfid } = req.body;
   if (!ownerId || !rfid) return res.status(400).json({ message: 'ownerId and rfid required' });
 
   const owner = await Owner.findById(ownerId);
   if (!owner) return res.status(404).json({ message: 'Owner not found' });
 
-  if (owner.rfid !== rfid) {
-    return res.status(400).json({ message: 'RFID mismatch' });
-  }
+  if (owner.rfid !== rfid) return res.status(400).json({ message: 'RFID mismatch' });
 
   res.json({
     success: true,
@@ -41,7 +39,6 @@ exports.scanRFID = catchAsyncErrors(async (req, res) => {
 });
 
 // POST /api/owners/auth/otp/send
-// body: { ownerId }
 exports.sendOtp = catchAsyncErrors(async (req, res) => {
   const { ownerId } = req.body;
   if (!ownerId) return res.status(400).json({ message: 'ownerId required' });
@@ -49,25 +46,28 @@ exports.sendOtp = catchAsyncErrors(async (req, res) => {
   const owner = await Owner.findById(ownerId);
   if (!owner) return res.status(404).json({ message: 'Owner not found' });
 
-  // Per your spec: OTP should be 4 digits and masked as xxxxxx0120
-  // We’ll set it to "0120" for demo/testing and expire in 5 minutes
-  owner.otpCode = '0120';
-  owner.otpExpires = new Date(Date.now() + 5 * 60 * 1000);
+  const otp = generateOtp(); // 4-digit
+  owner.otpCode = otp;
+  owner.otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
   await owner.save();
 
-  // front-end can show: "OTP sent to xxxxxx0120"
+  // Send OTP: mocked
+  await sendOtp(owner.phone || owner.email || 'mock@local', otp);
+
+  // Msked (last 4)
+  const mask = (owner.phone && owner.phone.length >= 4) ? ('xxxxxx' + owner.phone.slice(-4)) : ('xxxxxx' + otp);
+
   res.json({
     success: true,
     step: 'otp_sent',
     ownerId: owner._id,
-    mask: 'xxxxxx0120',
+    mask,
     expiresInSeconds: 300,
     message: 'OTP sent'
   });
 });
 
 // POST /api/owners/auth/otp/verify
-// body: { ownerId, otp }
 exports.verifyOtp = catchAsyncErrors(async (req, res) => {
   const { ownerId, otp } = req.body;
   if (!ownerId || !otp) return res.status(400).json({ message: 'ownerId and otp required' });
@@ -79,19 +79,27 @@ exports.verifyOtp = catchAsyncErrors(async (req, res) => {
     return res.status(400).json({ message: 'OTP expired. Please resend.' });
   }
 
-  if (owner.otpCode !== otp) {
-    return res.status(400).json({ message: 'Invalid OTP' });
-  }
+  if (owner.otpCode !== otp) return res.status(400).json({ message: 'Invalid OTP' });
 
-  // success -> clear OTP
   owner.otpCode = null;
   owner.otpExpires = null;
   await owner.save();
+
+  const token = jwt.sign(
+    { id: owner._id, type: 'owner', name: owner.name },
+    process.env.JWT_SECRET,
+    { expiresIn: '2h' }
+  );
 
   res.json({
     success: true,
     step: 'otp_ok',
     owner: { id: owner._id, name: owner.name, role: owner.role },
-    message: `Welcome ${owner.name}`
+    message: `Welcome ${owner.name}`,
+    token
   });
 });
+
+// placeholders for not-yet-implemented owner-only endpoints
+exports.getExpiryReport = (req, res) => res.status(501).json({ message: 'Not implemented yet' });
+exports.getProductReport = (req, res) => res.status(501).json({ message: 'Not implemented yet' });

@@ -2,8 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const { getSalesReport } = require('../controllers/reportController');
+const { authOwner } = require('../middlewares/auth');
 
-router.post('/sales', getSalesReport);
-// (Future) router.get('/expiry', ...);
+// Generate sales/stock report
+router.post('/sales', authOwner, getSalesReport);
 
 module.exports = router;

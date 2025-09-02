@@ -1,121 +1,156 @@
 // scripts/seed.js
+require('dotenv').config();
 const mongoose = require('mongoose');
-const dotenv = require('dotenv');
-const User = require('../models/user');
 
-dotenv.config();
+const Owner = require('../models/Owner');
+const User = require('../models/User');
+const Inventory = require('../models/Inventory');
+const Bill = require('../models/Bill');
+const DispenseLog = require('../models/DispenseLog');
 
-const run = async () => {
+async function seed() {
   try {
     await mongoose.connect(process.env.MONGO_URI);
+    console.log('MongoDB connected for seeding...');
 
-    await User.deleteMany({});
+    // Clear old data
+    await Owner.deleteMany();
+    await User.deleteMany();
+    await Inventory.deleteMany();
+    await Bill.deleteMany();
+    await DispenseLog.deleteMany();
+    console.log('Old data cleared');
 
-    await User.create([
-      {
-        rfid: 'RFID1001',
-        name: 'Gourab',
-        balance: 15000,
-        prescriptions: [
-          {
-            id: '#0000125',
-            for: 'self',
-            medicines: [{ name: 'Paracetamol', quantity: 90, cost: 80 }],
-            collected: false
-          },
-          {
-            id: '#0000457',
-            for: 'wife',
-            medicines: [{ name: 'Amoxicillin', quantity: 20, cost: 120 }],
-            collected: false
-          }
-        ]
-      },
-      {
-        rfid: 'RFID1002',
-        name: 'Aarti',
-        balance: 8000,
-        prescriptions: [
-          {
-            id: '#0000456',
-            for: 'self',
-            medicines: [{ name: 'Vitamin C', quantity: 30, cost: 250 }],
-            collected: false
-          }
-        ]
-      }
-    ]);
-
-    console.log('✅ Seed complete');
-    process.exit(0);
-  } catch (e) {
-    console.error('❌ Seed error:', e);
-    process.exit(1);
-  }
-};
-
-run();
-// scripts/seed.js (append)
-const Owner = require('../models/Owner');
-
-async function seedOwners() {
-  await Owner.deleteMany({});
-  await Owner.create([
-    {
-      name: 'Admin One',
-      rfid: 'OWNER_RFID_1001',
-      fingerprintId: 'FP_1001',
-      phone: '+91XXXXXX0120',
+    // Owner
+    const owner = await Owner.create({
+      name: 'Main Owner',
+      phone: '8888888888',
+      rfid: 'OWNER123RFID',
+      fingerprintId: 'OWNER_FP_001',
+      serviceKey: 'SERVICE_KEY_ABC123',
       role: 'owner'
-    }
-  ]);
-  console.log('✅ Owners seeded');
-}
+    });
+    console.log('👤 Owner seeded:', owner.name);
 
-(async () => {
-  try {
-    // ... your current user seeding
-    await seedOwners();
-    console.log('✅ Seed complete');
-    process.exit(0);
-  } catch (e) {
-    console.error(e);
-    process.exit(1);
-  }
-})();
-const InventoryItem = require('../models/InventoryItem');
-const InventoryBatch = require('../models/InventoryBatch');
+    // User
+    const user1 = await User.create({
+      rfid: 'RFID123456',
+      name: 'Aniket',
+      balance: 1000,
+      age: 28,
+      phone: '9999999999',
+      email: 'aniket@example.com',
+      gender: 'Male',
+      address: 'Pune, India',
+      prescriptions: [
+        {
+          id: '#0000125',
+          for: 'self',
+          medicines: [
+            { name: 'Paracetamol', quantity: 2, cost: 10 },
+            { name: 'Cough Syrup', quantity: 1, cost: 50 }
+          ],
+          collected: false
+        },
+        {
+          id: '#0000126',
+          for: 'other',
+          medicines: [
+            { name: 'Antibiotic', quantity: 1, cost: 100 }
+          ],
+          collected: true,
+          collectedAt: new Date()
+        }
+      ]
+    });
+    console.log('👤 User seeded:', user1.name);
 
-async function seedInventory() {
-  await InventoryBatch.deleteMany({});
-  await InventoryItem.deleteMany({});
-
-  const items = await InventoryItem.insertMany([
-    {
+    // Inventory
+    const inv1 = await Inventory.create({
+      itemCode: 'INV1001',
       name: 'Paracetamol',
       genericName: 'Acetaminophen',
       brandName: 'Cipla',
-      mfgBy: 'Cipla',
-      marketedBy: 'Cipla',
-      itemCode: '1008765',
-      typeOfMedicine: 'box',
+      mfgBy: 'Cipla Ltd',
+      marketedBy: 'Cipla Healthcare',
+      typeOfMedicine: 'tablet',
+      totalInventory: 85,
       totalCapacity: 100,
-      totalInventory: 90,
-      day: 'Tuesday'
-    },
-    { name: 'Syringe', genericName: '', brandName: '', mfgBy: '', marketedBy: '', itemCode: '1008766', typeOfMedicine: 'pack', totalCapacity: 100, totalInventory: 30, day: 'Tuesday' },
-    { name: 'Intra vein', itemCode: '1008785', typeOfMedicine: 'pack', totalCapacity: 50, totalInventory: 4, day: 'Tuesday' },
-    { name: 'Cough Syrup', itemCode: '1008762', typeOfMedicine: 'bottle', totalCapacity: 150, totalInventory: 15, day: 'Tuesday' },
-    { name: 'Anti biotic', itemCode: '1008761', typeOfMedicine: 'box', totalCapacity: 150, totalInventory: 60, day: 'Tuesday' },
-    { name: 'Bandage', itemCode: '1008795', typeOfMedicine: 'pack', totalCapacity: 50, totalInventory: 6, day: 'Tuesday' },
-    { name: 'Oinments', itemCode: '1008725', typeOfMedicine: 'box', totalCapacity: 20, totalInventory: 1, day: 'Tuesday' },
-    { name: 'Disprin', itemCode: '1008742', typeOfMedicine: 'stripes', totalCapacity: 100, totalInventory: 60, day: 'Tuesday' },
-    { name: 'Needles', itemCode: '1008796', typeOfMedicine: 'pack', totalCapacity: 150, totalInventory: 60, day: 'Tuesday' },
-  ]);
+      expiryDate: new Date('2026-08-31')
+    });
 
-  await InventoryBatch.insertMany([
-    { item: items[0]._id, batchNo: 'B5644HGH', quantity: 90 },
-  ]);
+    const inv2 = await Inventory.create({
+      itemCode: 'INV1002',
+      name: 'Cough Syrup',
+      genericName: 'Dextromethorphan + CPM',
+      brandName: 'Benadryl',
+      mfgBy: 'Johnson & Johnson',
+      marketedBy: 'J&J',
+      typeOfMedicine: 'bottle',
+      totalInventory: 50,
+      totalCapacity: 100,
+      expiryDate: new Date('2026-09-30')
+    });
 
-  console.log('✅ Inventory seeded');
+    const inv3 = await Inventory.create({
+      itemCode: 'INV1003',
+      name: 'Antibiotic',
+      genericName: 'Amoxicillin',
+      brandName: 'Mox',
+      mfgBy: 'Ranbaxy',
+      marketedBy: 'Sun Pharma',
+      typeOfMedicine: 'strips',
+      totalInventory: 30,
+      totalCapacity: 100,
+      expiryDate: new Date('2026-10-15')
+    });
+    console.log('Inventory seeded:', [inv1.name, inv2.name, inv3.name]);
+
+
+    // Sample Bill (for collected prescription)
+    const sampleBill = await Bill.create({
+      billNumber: `BILL-${Date.now()}`,
+      billingDate: new Date(),
+      userId: user1._id,
+      prescriptionId: '#0000126',
+      relation: 'self',
+      patient: {
+        name: user1.name,
+        age: user1.age,
+        phone: user1.phone,
+        email: user1.email,
+        gender: user1.gender,
+        address: user1.address
+      },
+      medicines: [
+        { name: 'Antibiotic', quantity: 1, costPerUnit: 100, lineTotal: 100 }
+      ],
+      total: 100
+    });
+    console.log('🧾 Sample Bill seeded:', sampleBill.billNumber);
+
+    // DispenseLog linked to bill
+    const sampleLog = await DispenseLog.create({
+      itemCode: inv3.itemCode,
+      itemName: inv3.name,
+      quantity: 1,
+      costPerUnit: 100,
+      lineTotal: 100,
+      totalCost: 100,
+      billNumber: sampleBill.billNumber,
+      userId: user1._id,
+      ownerId: owner._id,
+      prescriptionId: '#0000126',
+      dispensedAt: new Date()
+    });
+    console.log('Sample DispenseLog seeded:', sampleLog.itemName);
+
+    console.log('Seeding completed successfully');
+    process.exit(0);
+  } catch (err) {
+    console.error('Seeding error:', err);
+    process.exit(1);
+  }
 }
+
+seed();
