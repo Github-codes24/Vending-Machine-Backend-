@@ -14,6 +14,11 @@ const { authLimiter } = require('./middlewares/rateLimiter');
 
 const app = express();
 
+const debugRoutes = require('./routes/debugRoutes');
+
+// TEMPORARY: Enable OTP debug route for frontend testing
+app.use('/api/debug', debugRoutes);
+
 // Security headers
 app.use(helmet());
 
